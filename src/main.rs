@@ -552,7 +552,7 @@ impl MainHandler {
                                 ))*/
                             }
                         };*/
-
+                        /*
                         // Read token value from field
                         let mut token = String::new();
                         csrf_field
@@ -568,7 +568,7 @@ impl MainHandler {
                                 status::BadRequest,
                                 String::from("csrf token does not match"),
                             ));*/
-                        }
+                        }*/
 
                         // Grab all the fields named files
                         let files_fields = match entries.fields.get("files") {
