@@ -47,7 +47,7 @@ lazy_static! {
 }
 
 fn main() {
-    let matches = clap::App::new("Simple HTTP(s) Server")
+    let matches = clap::App::new("Simpler HTTP(s) Server")
         .setting(clap::AppSettings::ColoredHelp)
         .version(crate_version!())
         .arg(clap::Arg::with_name("root")
@@ -70,7 +70,7 @@ fn main() {
         .arg(clap::Arg::with_name("upload")
              .short("u")
              .long("upload")
-             .help("Enable upload files. (multiple select) (CSRF token required)"))
+             .help("Enable upload files. (multiple select)"))
         .arg(clap::Arg::with_name("redirect").long("redirect")
              .takes_value(true)
              .validator(|url_string| iron::Url::parse(url_string.as_str()).map(|_| ()))
@@ -273,7 +273,7 @@ fn main() {
         let host = format!("http://{}", &addr);
 
         match open::that(&host) {
-            Ok(_) => println!("Openning {} in default browser", &host),
+            Ok(_) => println!("Opening {} in default browser", &host),
             Err(err) => eprintln!("Unable to open in default browser {}", err),
         }
     }
@@ -282,11 +282,7 @@ fn main() {
     let base_url: &str = matches.value_of("base-url").unwrap();
 
     let upload: Option<Upload> = if upload_arg {
-        let token: String = thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(10)
-            .map(char::from)
-            .collect();
+        let token: String = "notoken";
         Some(Upload { csrf_token: token })
     } else {
         None
@@ -542,15 +538,7 @@ impl MainHandler {
                 match multipart.save().size_limit(self.upload_size_limit).temp() {
                     SaveResult::Full(entries) => {
                         // Pull out csrf field to check if token matches one generated
-                        let csrf_field = match entries
-                            .fields
-                            .get("csrf")
-                            .map(|fields| fields.first())
-                            .unwrap_or(None)
-                        {
-                            Some(field) => field,
-                            None => None,
-                        };
+                        let csrf_field: &str = "notoken";
 
                         // Read token value from field
                         let mut token = String::new();
@@ -562,12 +550,13 @@ impl MainHandler {
                             .unwrap();
 
                         // Check if they match
+                        /*
                         if self.upload.as_ref().unwrap().csrf_token != token {
                             return Err((
                                 status::BadRequest,
                                 String::from("csrf token does not match"),
                             ));
-                        }
+                        }*/
 
                         // Grab all the fields named files
                         let files_fields = match entries.fields.get("files") {
