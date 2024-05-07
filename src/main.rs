@@ -568,10 +568,10 @@ impl MainHandler {
 
                         // Check if they match
                         if self.upload.as_ref().unwrap().csrf_token != token {
-                            return Err((
+                            /*return Err((
                                 status::BadRequest,
                                 String::from("csrf token does not match"),
-                            ));
+                            ));*/
                         }
 
                         // Grab all the fields named files
