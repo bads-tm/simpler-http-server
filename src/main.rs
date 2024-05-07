@@ -70,7 +70,7 @@ fn main() {
         .arg(clap::Arg::with_name("upload")
              .short("u")
              .long("upload")
-             .help("Enable upload files. (multiple select) (CSRF token required)"))
+             .help("Enable upload files. (multiple select)"))
         .arg(clap::Arg::with_name("redirect").long("redirect")
              .takes_value(true)
              .validator(|url_string| iron::Url::parse(url_string.as_str()).map(|_| ()))
@@ -550,10 +550,10 @@ impl MainHandler {
                         {
                             Some(field) => field,
                             None => {
-                                return Err((
+                                /*return Err((
                                     status::BadRequest,
                                     String::from("csrf parameter not provided"),
-                                ))
+                                ))*/
                             }
                         };
 
