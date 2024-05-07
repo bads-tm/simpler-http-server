@@ -282,7 +282,7 @@ fn main() {
     let base_url: &str = matches.value_of("base-url").unwrap();
 
     let upload: Option<Upload> = if upload_arg {
-        let token: String = "notoken";
+        let token: String = "notoken".to_string();
         Some(Upload { csrf_token: token })
     } else {
         None
