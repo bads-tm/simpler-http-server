@@ -70,7 +70,7 @@ fn main() {
         .arg(clap::Arg::with_name("upload")
              .short("u")
              .long("upload")
-             .help("Enable upload files. (multiple select)"))
+             .help("Enable upload files. (multiple select) (CSRF token required)"))
         .arg(clap::Arg::with_name("redirect").long("redirect")
              .takes_value(true)
              .validator(|url_string| iron::Url::parse(url_string.as_str()).map(|_| ()))
@@ -542,17 +542,16 @@ impl MainHandler {
                 match multipart.save().size_limit(self.upload_size_limit).temp() {
                     SaveResult::Full(entries) => {
                         // Pull out csrf field to check if token matches one generated
-                        let csrf_field = "notoken";
-                        /*{
+                        let csrf_field = match entries
+                            .fields
+                            .get("csrf")
+                            .map(|fields| fields.first())
+                            .unwrap_or(None)
+                        {
                             Some(field) => field,
-                            None => {
-                                /*return Err((
-                                    status::BadRequest,
-                                    String::from("csrf parameter not provided"),
-                                ))*/
-                            }
-                        };*/
-                        /*
+                            None => None,
+                        };
+
                         // Read token value from field
                         let mut token = String::new();
                         csrf_field
@@ -564,11 +563,11 @@ impl MainHandler {
 
                         // Check if they match
                         if self.upload.as_ref().unwrap().csrf_token != token {
-                            /*return Err((
+                            return Err((
                                 status::BadRequest,
                                 String::from("csrf token does not match"),
-                            ));*/
-                        }*/
+                            ));
+                        }
 
                         // Grab all the fields named files
                         let files_fields = match entries.fields.get("files") {
