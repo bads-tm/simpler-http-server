@@ -26,8 +26,8 @@ use multipart::server::{Multipart, SaveResult};
 use path_dedot::ParseDot;
 use percent_encoding::percent_decode;
 use pretty_bytes::converter::convert;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+//use rand::distributions::Alphanumeric;
+//use rand::{thread_rng, Rng};
 use termcolor::{Color, ColorSpec};
 
 use color::{build_spec, Printer};
