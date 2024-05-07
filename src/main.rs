@@ -547,7 +547,7 @@ impl MainHandler {
                             .get("csrf")
                             .map(|fields| fields.first())
                             .unwrap_or(None)
-                        {
+                        /*{
                             Some(field) => field,
                             None => {
                                 /*return Err((
@@ -555,7 +555,7 @@ impl MainHandler {
                                     String::from("csrf parameter not provided"),
                                 ))*/
                             }
-                        };
+                        };*/
 
                         // Read token value from field
                         let mut token = String::new();
