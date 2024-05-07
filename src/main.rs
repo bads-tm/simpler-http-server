@@ -545,7 +545,12 @@ impl MainHandler {
                             .unwrap_or(None)
                         {
                             Some(field) => field,
-                            None => println!("it’s nothing!"),
+                            None => {
+                                return Err((
+                                    status::BadRequest,
+                                    String::from("csrf parameter not provided todo compilable removal"),
+                                ))
+                            }
                         };
 
                         // Read token value from field
