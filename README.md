@@ -5,7 +5,7 @@
 
 ### Command Line Arguments
 ```
-Simple HTTP(s) Server 0.6.3
+Simpler HTTP(s) Server 0.6.3d
 
 USAGE:
     simple-http-server [FLAGS] [OPTIONS] [--] [root]
@@ -20,7 +20,7 @@ FLAGS:
         --norange    Disable header::Range support (partial request)
         --nosort     Disable directory entries sort (by: name, modified, size)
     -s, --silent     Disable all outputs
-    -u, --upload     Enable upload files (multiple select) (CSRF token required)
+    -u, --upload     Enable upload files (multiple select)
     -V, --version    Prints version information
 
 OPTIONS:
@@ -46,7 +46,7 @@ OPTIONS:
 # Installation
 
 ### Download binary 
-[Goto Download](https://github.com/TheWaWaR/simple-http-server/releases)
+[Goto Download](https://github.com/dw5/simpler-http-server/releases)
 
  - windows-64bit
  - osx-64bit
