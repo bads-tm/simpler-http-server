@@ -542,11 +542,7 @@ impl MainHandler {
                 match multipart.save().size_limit(self.upload_size_limit).temp() {
                     SaveResult::Full(entries) => {
                         // Pull out csrf field to check if token matches one generated
-                        let csrf_field = match entries
-                            .fields
-                            .get("csrf")
-                            .map(|fields| fields.first())
-                            .unwrap_or(None)
+                        let csrf_field = "notoken";
                         /*{
                             Some(field) => field,
                             None => {
