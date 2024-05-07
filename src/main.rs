@@ -47,7 +47,7 @@ lazy_static! {
 }
 
 fn main() {
-    let matches = clap::App::new("Simple HTTP(s) Server")
+    let matches = clap::App::new("Simpler HTTP(s) Server")
         .setting(clap::AppSettings::ColoredHelp)
         .version(crate_version!())
         .arg(clap::Arg::with_name("root")
@@ -70,7 +70,7 @@ fn main() {
         .arg(clap::Arg::with_name("upload")
              .short("u")
              .long("upload")
-             .help("Enable upload files. (multiple select) (CSRF token required)"))
+             .help("Enable upload files. (multiple select)"))
         .arg(clap::Arg::with_name("redirect").long("redirect")
              .takes_value(true)
              .validator(|url_string| iron::Url::parse(url_string.as_str()).map(|_| ()))
@@ -214,7 +214,7 @@ fn main() {
             .long("base-url")
             .default_value("/")
             .takes_value(true)
-            .help("Base URL to prepend in directory indexes. For reverse proxying. This prefix is supposed to be pre-stripped when reaching simple-http-server."))
+            .help("Base URL to prepend in directory indexes. For reverse proxying. This prefix is supposed to be pre-stripped when reaching simpler-http-server."))
         .get_matches();
 
     let root = matches
@@ -273,7 +273,7 @@ fn main() {
         let host = format!("http://{}", &addr);
 
         match open::that(&host) {
-            Ok(_) => println!("Openning {} in default browser", &host),
+            Ok(_) => println!("Opening {} in default browser", &host),
             Err(err) => eprintln!("Unable to open in default browser {}", err),
         }
     }
@@ -282,11 +282,7 @@ fn main() {
     let base_url: &str = matches.value_of("base-url").unwrap();
 
     let upload: Option<Upload> = if upload_arg {
-        let token: String = thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(10)
-            .map(char::from)
-            .collect();
+        let token: String = "notoken";
         Some(Upload { csrf_token: token })
     } else {
         None
@@ -402,7 +398,7 @@ fn main() {
     let rv = if cert.is_some() {
         printer
             .println_err(
-                "{}: TLS support is not enabled during compilation of simple-http-server",
+                "{}: TLS support is not enabled during compilation of simpler-http-server",
                 &[("ERROR", &Some(build_spec(Some(Color::Red), true)))],
             )
             .unwrap();
@@ -567,12 +563,12 @@ impl MainHandler {
                             .unwrap();
 
                         // Check if they match
-                        if self.upload.as_ref().unwrap().csrf_token != token {
+                        /*if self.upload.as_ref().unwrap().csrf_token != token {
                             return Err((
                                 status::BadRequest,
                                 String::from("csrf token does not match"),
                             ));
-                        }
+                        }*/
 
                         // Grab all the fields named files
                         let files_fields = match entries.fields.get("files") {
