@@ -70,7 +70,7 @@ fn main() {
         .arg(clap::Arg::with_name("upload")
              .short("u")
              .long("upload")
-             .help("Enable upload files. (multiple select)"))
+             .help("Enable upload files. (multiple select) (CSRF token required)"))
         .arg(clap::Arg::with_name("redirect").long("redirect")
              .takes_value(true)
              .validator(|url_string| iron::Url::parse(url_string.as_str()).map(|_| ()))
@@ -282,7 +282,11 @@ fn main() {
     let base_url: &str = matches.value_of("base-url").unwrap();
 
     let upload: Option<Upload> = if upload_arg {
-        let token = "notoken";
+        let token: String = thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(10)
+            .map(char::from)
+            .collect();
         Some(Upload { csrf_token: token })
     } else {
         None
@@ -545,12 +549,12 @@ impl MainHandler {
                             .unwrap_or(None)
                         {
                             Some(field) => field,
-                            /*None => {
+                            None => {
                                 return Err((
                                     status::BadRequest,
                                     String::from("csrf parameter not provided"),
                                 ))
-                            }*/
+                            }
                         };
 
                         // Read token value from field
@@ -563,12 +567,12 @@ impl MainHandler {
                             .unwrap();
 
                         // Check if they match
-                        /*if self.upload.as_ref().unwrap().csrf_token != token {
+                        if self.upload.as_ref().unwrap().csrf_token != token {
                             return Err((
                                 status::BadRequest,
                                 String::from("csrf token does not match"),
                             ));
-                        }*/
+                        }
 
                         // Grab all the fields named files
                         let files_fields = match entries.fields.get("files") {
