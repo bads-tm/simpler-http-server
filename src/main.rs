@@ -545,13 +545,7 @@ impl MainHandler {
                             .unwrap_or(None)
                         {
                             Some(field) => field,
-                            None => {
-                                println!("IGNORE csrf parameter not provided");
-                                /*return Err((
-                                    status::BadRequest,
-                                    String::from("csrf parameter not provided"),
-                                ))*/
-                            }
+                            None => println!("it’s nothing!"),
                         };
 
                         // Read token value from field
