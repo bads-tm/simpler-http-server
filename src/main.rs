@@ -546,10 +546,11 @@ impl MainHandler {
                         {
                             Some(field) => field,
                             None => {
-                                return Err((
+                                println!("IGNORE csrf parameter not provided");
+                                /*return Err((
                                     status::BadRequest,
                                     String::from("csrf parameter not provided"),
-                                ))
+                                ))*/
                             }
                         };
 
