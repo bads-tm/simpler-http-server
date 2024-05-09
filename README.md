@@ -8,7 +8,7 @@
 Simpler HTTP(s) Server 0.6.3d
 
 USAGE:
-    simple-http-server [FLAGS] [OPTIONS] [--] [root]
+    simpler-http-server [FLAGS] [OPTIONS] [--] [root]
 
 FLAGS:
         --coep       Add "Cross-Origin-Embedder-Policy" HTTP header and set it to "require-corp"
@@ -59,10 +59,10 @@ OPTIONS:
 # Install Rust
 curl https://sh.rustup.rs -sSf | sh
 
-# Install simple-http-server
-cargo install simple-http-server
+# Install simpler-http-server
+cargo install simpler-http-server
 rehash
-simple-http-server -h
+simpler-http-server -h
 ```
 
 # Features

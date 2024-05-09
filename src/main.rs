@@ -283,7 +283,6 @@ fn main() {
         printer
             .println_out(
                 r#"     Index: {}, Upload: {}, Cache: {}, Cors: {}, Coop: {}, Coep: {}, Range: {}, Sort: {}, Threads: {}
-          Upload: {}, CSRF Token: {}
           Auth: {}, Compression: {}
          https: {}, Cert: {}, Cert-Password: {}
           Root: {},
