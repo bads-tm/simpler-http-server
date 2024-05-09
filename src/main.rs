@@ -518,26 +518,30 @@ impl MainHandler {
                 // in a new temporary directory under the OS temporary directory.
                 match multipart.save().size_limit(self.upload_size_limit).temp() {
                     SaveResult::Full(entries) => {
-                        for (_, fields) in entries.fields {
-                            for field in fields {
-                                let mut data = field.data.readable().unwrap();
-                                let headers = &field.headers;
-                                let mut target_path = path.clone();
 
-                                target_path.push(headers.filename.clone().unwrap());
-                                if let Err(errno) = std::fs::File::create(target_path)
-                                    .and_then(|mut file| io::copy(&mut data, &mut file))
-                                {
-                                    return Err((
-                                        status::InternalServerError,
-                                        format!("Copy file failed: {}", errno),
-                                    ));
-                                } else {
-                                    println!(
-                                        "  >> File saved: {}",
-                                        headers.filename.clone().unwrap()
-                                    );
-                                }
+                        // Grab all the fields named files
+                        let files_fields = match entries.fields.get("files") {
+                            Some(fields) => fields,
+                            None => {
+                                return Err((status::BadRequest, String::from("no files provided")))
+                            }
+                        };
+
+                        for field in files_fields {
+                            let mut data = field.data.readable().unwrap();
+                            let headers = &field.headers;
+                            let mut target_path = path.to_owned();
+
+                            target_path.push(headers.filename.clone().unwrap());
+                            if let Err(errno) = std::fs::File::create(target_path)
+                                .and_then(|mut file| io::copy(&mut data, &mut file))
+                            {
+                                return Err((
+                                    status::InternalServerError,
+                                    format!("Copy file failed: {}", errno),
+                                ));
+                            } else {
+                                println!("  >> File saved: {}", headers.filename.clone().unwrap());
                             }
                         }
                         Ok(())
