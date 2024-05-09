@@ -300,7 +300,6 @@ fn main() {
                     enable_string(range),
                     enable_string(sort),
                     threads.to_string(),
-                    enable_string(upload_arg),
                     auth.unwrap_or("disabled").to_string(),
                     compression_string,
                     (if cert.is_some() {
