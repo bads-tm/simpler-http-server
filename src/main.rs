@@ -222,7 +222,7 @@ fn main() {
         .map(|s| PathBuf::from(s).canonicalize().unwrap())
         .unwrap_or_else(|| env::current_dir().unwrap());
     let index = matches.is_present("index");
-    let upload_arg = matches.is_present("upload");
+    let upload = matches.is_present("upload");
     let redirect_to = matches
         .value_of("redirect")
         .map(iron::Url::parse)
@@ -281,18 +281,10 @@ fn main() {
     let silent = matches.is_present("silent");
     let base_url: &str = matches.value_of("base-url").unwrap();
 
-    let upload: Option<Upload> = if upload_arg {
-        let token: String = "notoken".to_string();
-        Some(Upload { csrf_token: token })
-    } else {
-        None
-    };
-
     if !silent {
         printer
             .println_out(
-                r#"     Index: {}, Cache: {}, Cors: {}, Coop: {}, Coep: {}, Range: {}, Sort: {}, Threads: {}
-          Upload: {}, CSRF Token: {}
+                r#"     Index: {}, Upload: {}, Cache: {}, Cors: {}, Coop: {}, Coep: {}, Range: {}, Sort: {}, Threads: {}
           Auth: {}, Compression: {}
          https: {}, Cert: {}, Cert-Password: {}
           Root: {},
@@ -301,6 +293,7 @@ fn main() {
     ======== [{}] ========"#,
                 &vec![
                     enable_string(index),
+                    enable_string(upload),
                     enable_string(cache),
                     enable_string(cors),
                     enable_string(coop),
@@ -308,12 +301,6 @@ fn main() {
                     enable_string(range),
                     enable_string(sort),
                     threads.to_string(),
-                    enable_string(upload_arg),
-                    (if upload.is_some() {
-                        upload.as_ref().unwrap().csrf_token.as_str()
-                    } else {
-                        ""
-                    })
                     .to_string(),
                     auth.unwrap_or("disabled").to_string(),
                     compression_string,
@@ -421,14 +408,11 @@ fn main() {
         std::process::exit(1);
     };
 }
-struct Upload {
-    csrf_token: String,
-}
 
 struct MainHandler {
     root: PathBuf,
     index: bool,
-    upload: Option<Upload>,
+    upload: bool,
     cache: bool,
     range: bool,
     coop: bool,
@@ -537,62 +521,26 @@ impl MainHandler {
                 // in a new temporary directory under the OS temporary directory.
                 match multipart.save().size_limit(self.upload_size_limit).temp() {
                     SaveResult::Full(entries) => {
-                        // Pull out csrf field to check if token matches one generated
-                        let csrf_field = match entries
-                            .fields
-                            .get("csrf")
-                            .map(|fields| fields.first())
-                            .unwrap_or(None)
-                        {
-                            Some(field) => field,
-                            None => {
-                                return Err((
-                                    status::BadRequest,
-                                    String::from("csrf parameter not provided todo compilable removal"),
-                                ))
-                            }
-                        };
+                        for (_, fields) in entries.fields {
+                            for field in fields {
+                                let mut data = field.data.readable().unwrap();
+                                let headers = &field.headers;
+                                let mut target_path = path.clone();
 
-                        // Read token value from field
-                        let mut token = String::new();
-                        csrf_field
-                            .data
-                            .readable()
-                            .unwrap()
-                            .read_to_string(&mut token)
-                            .unwrap();
-
-                        // Check if they match
-                        /*if self.upload.as_ref().unwrap().csrf_token != token {
-                            return Err((
-                                status::BadRequest,
-                                String::from("csrf token does not match"),
-                            ));
-                        }*/
-
-                        // Grab all the fields named files
-                        let files_fields = match entries.fields.get("files") {
-                            Some(fields) => fields,
-                            None => {
-                                return Err((status::BadRequest, String::from("no files provided")))
-                            }
-                        };
-
-                        for field in files_fields {
-                            let mut data = field.data.readable().unwrap();
-                            let headers = &field.headers;
-                            let mut target_path = path.to_owned();
-
-                            target_path.push(headers.filename.clone().unwrap());
-                            if let Err(errno) = std::fs::File::create(target_path)
-                                .and_then(|mut file| io::copy(&mut data, &mut file))
-                            {
-                                return Err((
-                                    status::InternalServerError,
-                                    format!("Copy file failed: {}", errno),
-                                ));
-                            } else {
-                                println!("  >> File saved: {}", headers.filename.clone().unwrap());
+                                target_path.push(headers.filename.clone().unwrap());
+                                if let Err(errno) = std::fs::File::create(target_path)
+                                    .and_then(|mut file| io::copy(&mut data, &mut file))
+                                {
+                                    return Err((
+                                        status::InternalServerError,
+                                        format!("Copy file failed: {}", errno),
+                                    ));
+                                } else {
+                                    println!(
+                                        "  >> File saved: {}",
+                                        headers.filename.clone().unwrap()
+                                    );
+                                }
                             }
                         }
                         Ok(())
@@ -829,12 +777,10 @@ impl MainHandler {
                 r#"
 <form style="margin-top:1em; margin-bottom:1em;" action="{base_url}{path}" method="POST" enctype="multipart/form-data">
   <input type="file" name="files" accept="*" multiple />
-  <input type="hidden" name="csrf" value="{csrf}"/>
   <input type="submit" value="Upload" />
 </form>
 "#,
                 path = encode_link_path(path_prefix),
-                csrf = self.upload.as_ref().unwrap().csrf_token,
                 base_url = base_url,
             )
         } else {
