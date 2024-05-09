@@ -284,7 +284,7 @@ fn main() {
     if !silent {
         printer
             .println_out(
-                r#"     Index: {}, Upload: {}, Cache: {}, Cors: {}, Coop: {}, Coep: {}, Range: {}, Sort: {}, Threads: {}
+                r#"     Index: {}, Upload: {}, Cache: {}, Cors: {}, Range: {}, Sort: {}, Threads: {}
           Auth: {}, Compression: {}
          https: {}, Cert: {}, Cert-Password: {}
           Root: {},
@@ -296,12 +296,9 @@ fn main() {
                     enable_string(upload),
                     enable_string(cache),
                     enable_string(cors),
-                    enable_string(coop),
-                    enable_string(coep),
                     enable_string(range),
                     enable_string(sort),
                     threads.to_string(),
-                    .to_string(),
                     auth.unwrap_or("disabled").to_string(),
                     compression_string,
                     (if cert.is_some() {
@@ -463,7 +460,7 @@ impl Handler for MainHandler {
             ));
         }
 
-        if self.upload.is_some() && req.method == method::Post {
+        if self.upload() && req.method == method::Post {
             if let Err((s, msg)) = self.save_files(req, &fs_path) {
                 return Ok(error_resp(s, &msg, &self.base_url));
             } else if self.base_url == "/" {
@@ -772,7 +769,7 @@ impl MainHandler {
         }
 
         // Optional upload form
-        let upload_form = if self.upload.is_some() {
+        let upload_form = if self.upload() {
             format!(
                 r#"
 <form style="margin-top:1em; margin-bottom:1em;" action="{base_url}{path}" method="POST" enctype="multipart/form-data">
