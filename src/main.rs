@@ -23,17 +23,16 @@ use iron_cors::CorsMiddleware;
 use lazy_static::lazy_static;
 use mime_guess as mime_types;
 use multipart::server::{Multipart, SaveResult};
+use open;
 use path_dedot::ParseDot;
 use percent_encoding::percent_decode;
 use pretty_bytes::converter::convert;
-//use rand::distributions::Alphanumeric;
-//use rand::{thread_rng, Rng};
 use termcolor::{Color, ColorSpec};
 
 use color::{build_spec, Printer};
 use util::{
-    enable_string, encode_link_path, error_io2iron, error_resp, now_string, root_link,
-    system_time_to_date_time, StringError,
+    enable_string, encode_link_path, error_io2iron, error_resp, now_string,
+    system_time_to_date_time, StringError, ROOT_LINK,
 };
 
 use middlewares::{AuthChecker, CompressionHandler, RequestLogger};
@@ -47,7 +46,7 @@ lazy_static! {
 }
 
 fn main() {
-    let matches = clap::App::new("Simpler HTTP(s) Server")
+    let matches = clap::App::new("Simple HTTP(s) Server")
         .setting(clap::AppSettings::ColoredHelp)
         .version(crate_version!())
         .arg(clap::Arg::with_name("root")
@@ -70,7 +69,7 @@ fn main() {
         .arg(clap::Arg::with_name("upload")
              .short("u")
              .long("upload")
-             .help("Enable upload files. (multiple select)"))
+             .help("Enable upload files (multiple select)"))
         .arg(clap::Arg::with_name("redirect").long("redirect")
              .takes_value(true)
              .validator(|url_string| iron::Url::parse(url_string.as_str()).map(|_| ()))
@@ -101,12 +100,6 @@ fn main() {
         .arg(clap::Arg::with_name("cors")
              .long("cors")
              .help("Enable CORS via the \"Access-Control-Allow-Origin\" header"))
-        .arg(clap::Arg::with_name("coop")
-             .long("coop")
-             .help("Add \"Cross-Origin-Opener-Policy\" HTTP header and set it to \"same-origin\""))
-        .arg(clap::Arg::with_name("coep")
-             .long("coep")
-             .help("Add \"Cross-Origin-Embedder-Policy\" HTTP header and set it to \"require-corp\""))
         .arg(clap::Arg::with_name("certpass").
              long("certpass")
              .takes_value(true)
@@ -209,12 +202,6 @@ fn main() {
              .long("open")
              .short("o")
              .help("Open the page in the default browser"))
-        .arg(clap::Arg::with_name("base-url")
-            .short("b")
-            .long("base-url")
-            .default_value("/")
-            .takes_value(true)
-            .help("Base URL to prepend in directory indexes. For reverse proxying. This prefix is supposed to be pre-stripped when reaching simpler-http-server."))
         .get_matches();
 
     let root = matches
@@ -233,8 +220,6 @@ fn main() {
     let cert = matches.value_of("cert");
     let certpass = matches.value_of("certpass");
     let cors = matches.is_present("cors");
-    let coop = matches.is_present("coop");
-    let coep = matches.is_present("coep");
     let ip = matches.value_of("ip").unwrap();
     let port = matches.value_of("port").unwrap().parse::<u16>().unwrap();
     let upload_size_limit = matches
@@ -250,11 +235,7 @@ fn main() {
     let printer = Printer::new();
     let color_blue = Some(build_spec(Some(Color::Blue), false));
     let color_red = Some(build_spec(Some(Color::Red), false));
-    let addr = if IpAddr::from_str(ip).unwrap().is_ipv4() {
-        format!("{}:{}", ip, port)
-    } else {
-        format!("[{}]:{}", ip, port)
-    };
+    let addr = format!("{}:{}", ip, port);
     let compression_exts = compress
         .clone()
         .unwrap_or_default()
@@ -273,13 +254,12 @@ fn main() {
         let host = format!("http://{}", &addr);
 
         match open::that(&host) {
-            Ok(_) => println!("Opening {} in default browser", &host),
-            Err(err) => eprintln!("Unable to open in default browser {}", err),
+            Ok(_) => println!("Openning {} in default browser", &host),
+            Err(err) => eprintln!("Unable to open in default browser {}", err.to_string()),
         }
     }
 
     let silent = matches.is_present("silent");
-    let base_url: &str = matches.value_of("base-url").unwrap();
 
     if !silent {
         printer
@@ -331,8 +311,6 @@ fn main() {
         upload,
         cache,
         range,
-        coop,
-        coep,
         redirect_to,
         sort,
         compress: compress
@@ -340,7 +318,6 @@ fn main() {
             .map(|exts| exts.iter().map(|s| format!(".{}", s)).collect()),
         try_file_404: try_file_404.map(PathBuf::from),
         upload_size_limit,
-        base_url: base_url.to_string(),
     });
     if cors {
         chain.link_around(CorsMiddleware::with_allow_any());
@@ -364,13 +341,12 @@ fn main() {
     if !silent {
         chain.link_after(RequestLogger {
             printer: Printer::new(),
-            base_url: base_url.to_string(),
         });
     }
     let mut server = Iron::new(chain);
     server.threads = threads as usize;
 
-    #[cfg(feature = "native-tls")]
+    #[cfg(feature = "tls")]
     let rv = if let Some(cert) = cert {
         use hyper_native_tls::NativeTlsServer;
         let ssl = NativeTlsServer::new(cert, certpass.unwrap_or("")).unwrap();
@@ -378,11 +354,11 @@ fn main() {
     } else {
         server.http(&addr)
     };
-    #[cfg(not(feature = "native-tls"))]
+    #[cfg(not(feature = "tls"))]
     let rv = if cert.is_some() {
         printer
             .println_err(
-                "{}: TLS support is not enabled during compilation of simpler-http-server",
+                "{}: TLS support is not enabled during compilation of simple-http-server",
                 &[("ERROR", &Some(build_spec(Some(Color::Red), true)))],
             )
             .unwrap();
@@ -412,14 +388,11 @@ struct MainHandler {
     upload: bool,
     cache: bool,
     range: bool,
-    coop: bool,
-    coep: bool,
     redirect_to: Option<iron::Url>,
     sort: bool,
     compress: Option<Vec<String>>,
     try_file_404: Option<PathBuf>,
     upload_size_limit: u64,
-    base_url: String,
 }
 
 impl Handler for MainHandler {
@@ -460,21 +433,11 @@ impl Handler for MainHandler {
             ));
         }
 
-        if self.upload() && req.method == method::Post {
+        if self.upload && req.method == method::Post {
             if let Err((s, msg)) = self.save_files(req, &fs_path) {
-                return Ok(error_resp(s, &msg, &self.base_url));
-            } else if self.base_url == "/" {
-                return Ok(Response::with((status::Found, Redirect(req.url.clone()))));
+                return Ok(error_resp(s, &msg));
             } else {
-                let mut inner_url: iron::url::Url = req.url.clone().into();
-                let mut path: &str = inner_url.path();
-                if path.starts_with('/') {
-                    path = &path[1..];
-                }
-                let new_path = format!("{}{}", self.base_url, path);
-                inner_url.set_path(&new_path);
-                let new_url = iron::Url::from_generic_url(inner_url).unwrap();
-                return Ok(Response::with((status::Found, Redirect(new_url))));
+                return Ok(Response::with((status::Found, Redirect(req.url.clone()))));
             }
         }
 
@@ -502,7 +465,7 @@ impl Handler for MainHandler {
                 .iter()
                 .map(|s| s.to_string_lossy().to_string())
                 .collect();
-            self.list_directory(req, &fs_path, &path_prefix, &self.base_url[..])
+            self.list_directory(req, &fs_path, &path_prefix)
         } else {
             self.send_file(req, &fs_path)
         }
@@ -510,7 +473,11 @@ impl Handler for MainHandler {
 }
 
 impl MainHandler {
-    fn save_files(&self, req: &mut Request, path: &Path) -> Result<(), (status::Status, String)> {
+    fn save_files(
+        &self,
+        req: &mut Request,
+        path: &PathBuf,
+    ) -> Result<(), (status::Status, String)> {
         match Multipart::from_request(req) {
             Ok(mut multipart) => {
                 // Fetching all data and processing it.
@@ -542,10 +509,9 @@ impl MainHandler {
                         }
                         Ok(())
                     }
-                    SaveResult::Partial(_entries, reason) => Err((
-                        status::InternalServerError,
-                        format!("save file failed: {:?}", reason),
-                    )),
+                    SaveResult::Partial(_entries, reason) => {
+                        Err((status::InternalServerError, reason.unwrap_err().to_string()))
+                    }
                     SaveResult::Error(error) => {
                         Err((status::InternalServerError, error.to_string()))
                     }
@@ -561,9 +527,8 @@ impl MainHandler {
     fn list_directory(
         &self,
         req: &mut Request,
-        fs_path: &Path,
+        fs_path: &PathBuf,
         path_prefix: &[String],
-        base_url: &str,
     ) -> IronResult<Response> {
         struct Entry {
             filename: String,
@@ -571,7 +536,7 @@ impl MainHandler {
         }
 
         let mut resp = Response::with(status::Ok);
-        let mut fs_path = fs_path.to_owned();
+        let mut fs_path = fs_path.clone();
         let mut rows = Vec::new();
 
         let read_dir = fs::read_dir(&fs_path).map_err(error_io2iron)?;
@@ -587,20 +552,20 @@ impl MainHandler {
         // Breadcrumb navigation
         let breadcrumb = if !path_prefix.is_empty() {
             let mut breadcrumb = path_prefix.to_owned();
-            let mut bread_links: Vec<String> = vec![breadcrumb.pop().unwrap()];
+            let mut bread_links: Vec<String> = Vec::new();
+            bread_links.push(breadcrumb.pop().unwrap());
             while !breadcrumb.is_empty() {
                 bread_links.push(format!(
-                    r#"<a href="{base_url}{link}/"><strong>{label}</strong></a>"#,
+                    r#"<a href="/{link}/"><strong>{label}</strong></a>"#,
                     link = encode_link_path(&breadcrumb),
                     label = encode_minimal(&breadcrumb.pop().unwrap().to_owned()),
-                    base_url = base_url,
                 ));
             }
-            bread_links.push(root_link(base_url));
+            bread_links.push(ROOT_LINK.to_owned());
             bread_links.reverse();
             bread_links.join(" / ")
         } else {
-            root_link(base_url)
+            ROOT_LINK.to_owned()
         };
 
         // Sort links
@@ -624,13 +589,21 @@ impl MainHandler {
             }
 
             if let Some(field) = sort_field {
-                if !SORT_FIELDS.iter().any(|s| *s == field.as_str()) {
+                if SORT_FIELDS
+                    .iter()
+                    .position(|s| *s == field.as_str())
+                    .is_none()
+                {
                     return Err(IronError::new(
                         StringError(format!("Unknown sort field: {}", field)),
                         status::BadRequest,
                     ));
                 }
-                if ![ORDER_ASC, ORDER_DESC].iter().any(|s| *s == order) {
+                if vec![ORDER_ASC, ORDER_DESC]
+                    .iter()
+                    .position(|s| *s == order)
+                    .is_none()
+                {
                     return Err(IronError::new(
                         StringError(format!("Unknown sort order: {}", order)),
                         status::BadRequest,
@@ -672,17 +645,16 @@ impl MainHandler {
             format!(
                 r#"
 <tr>
-  <th><a href="{base_url}{link}?sort=name&order={name_order}">Name</a></th>
-  <th><a href="{base_url}{link}?sort=modified&order={modified_order}">Last modified</a></th>
-  <th><a href="{base_url}{link}?sort=size&order={size_order}">Size</a></th>
+  <th><a href="/{link}?sort=name&order={name_order}">Name</a></th>
+  <th><a href="/{link}?sort=modified&order={modified_order}">Last modified</a></th>
+  <th><a href="/{link}?sort=size&order={size_order}">Size</a></th>
 </tr>
 <tr><td style="border-top:1px dashed #BBB;" colspan="5"></td></tr>
 "#,
                 link = encode_link_path(&current_link),
                 name_order = order_labels.get("name").unwrap_or(&DEFAULT_ORDER),
                 modified_order = order_labels.get("modified").unwrap_or(&DEFAULT_ORDER),
-                size_order = order_labels.get("size").unwrap_or(&DEFAULT_ORDER),
-                base_url = base_url,
+                size_order = order_labels.get("size").unwrap_or(&DEFAULT_ORDER)
             )
         } else {
             "".to_owned()
@@ -698,13 +670,12 @@ impl MainHandler {
             rows.push(format!(
                 r#"
 <tr>
-  <td><a href="{base_url}{link}"><strong>[Up]</strong></a></td>
+  <td><a href="/{link}"><strong>[Up]</strong></a></td>
   <td></td>
   <td></td>
 </tr>
 "#,
-                link = encode_link_path(&link),
-                base_url = base_url,
+                link = encode_link_path(&link)
             ));
         } else {
             rows.push(r#"<tr><td>&nbsp;</td></tr>"#.to_owned());
@@ -754,7 +725,7 @@ impl MainHandler {
             rows.push(format!(
                 r#"
 <tr>
-  <td><a {linkstyle} href="{base_url}{link}">{label}</a></td>
+  <td><a {linkstyle} href="/{link}">{label}</a></td>
   <td style="color:#888;">[{modified}]</td>
   <td><bold>{filesize}</bold></td>
 </tr>
@@ -763,22 +734,20 @@ impl MainHandler {
                 link = encode_link_path(&link),
                 label = encode_minimal(&file_name_label),
                 modified = file_modified,
-                filesize = file_size,
-                base_url = base_url,
+                filesize = file_size
             ));
         }
 
-        // Optional upload form
-        let upload_form = if self.upload() {
+        // Optinal upload form
+        let upload_form = if self.upload {
             format!(
                 r#"
-<form style="margin-top:1em; margin-bottom:1em;" action="{base_url}{path}" method="POST" enctype="multipart/form-data">
+<form style="margin-top:1em; margin-bottom:1em;" action="/{path}" method="POST" enctype="multipart/form-data">
   <input type="file" name="files" accept="*" multiple />
   <input type="submit" value="Upload" />
 </form>
 "#,
-                path = encode_link_path(path_prefix),
-                base_url = base_url,
+                path = encode_link_path(path_prefix)
             )
         } else {
             "".to_owned()
@@ -812,8 +781,8 @@ impl MainHandler {
 
         resp.headers.set(headers::ContentType::html());
         if self.compress.is_some() {
-            if let Some(AcceptEncoding(encodings)) = req.headers.get::<AcceptEncoding>() {
-                for QualityItem { item, .. } in encodings {
+            if let Some(&AcceptEncoding(ref encodings)) = req.headers.get::<AcceptEncoding>() {
+                for &QualityItem { ref item, .. } in encodings {
                     if *item == Encoding::Deflate || *item == Encoding::Gzip {
                         resp.headers.set(ContentEncoding(vec![item.clone()]));
                     }
@@ -866,26 +835,19 @@ impl MainHandler {
                 let mime = mime_types::from_path(path).first_or_octet_stream();
                 resp.headers
                     .set_raw("content-type", vec![mime.to_string().into_bytes()]);
-                if self.coop {
-                    resp.headers.set_raw(
-                        "Cross-Origin-Opener-Policy",
-                        vec!["same-origin".to_string().into_bytes()],
-                    );
-                }
-                if self.coep {
-                    resp.headers.set_raw(
-                        "Cross-Origin-Embedder-Policy",
-                        vec!["require-corp".to_string().into_bytes()],
-                    );
-                }
+
                 if self.range {
                     let mut range = req.headers.get::<Range>();
 
                     if range.is_some() {
                         // [Reference]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-Match
                         // Check header::If-Match
-                        if let Some(IfMatch::Items(items)) = req.headers.get::<IfMatch>() {
-                            if !items.iter().any(|item| item.strong_eq(&etag)) {
+                        if let Some(&IfMatch::Items(ref items)) = req.headers.get::<IfMatch>() {
+                            if items
+                                .iter()
+                                .position(|item| item.strong_eq(&etag))
+                                .is_none()
+                            {
                                 return Err(IronError::new(
                                     StringError("Etag not matched".to_owned()),
                                     status::RangeNotSatisfiable,
@@ -896,8 +858,8 @@ impl MainHandler {
 
                     // [Reference]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-Range
                     let matched_ifrange = match req.headers.get::<IfRange>() {
-                        Some(IfRange::EntityTag(etag_ifrange)) => etag.weak_eq(etag_ifrange),
-                        Some(IfRange::Date(HttpDate(date_ifrange))) => {
+                        Some(&IfRange::EntityTag(ref etag_ifrange)) => etag.weak_eq(etag_ifrange),
+                        Some(&IfRange::Date(HttpDate(ref date_ifrange))) => {
                             time::at(modified) <= *date_ifrange
                         }
                         None => true,
@@ -907,8 +869,8 @@ impl MainHandler {
                     }
 
                     match range {
-                        Some(Range::Bytes(ranges)) => {
-                            if let Some(range) = ranges.first() {
+                        Some(&Range::Bytes(ref ranges)) => {
+                            if let Some(range) = ranges.get(0) {
                                 let (offset, length) = match *range {
                                     ByteRangeSpec::FromTo(x, mut y) => {
                                         // "x-y"
@@ -992,8 +954,8 @@ impl MainHandler {
             if resp.status != Some(status::PartialContent)
                 && exts.iter().any(|ext| path_str.ends_with(ext))
             {
-                if let Some(AcceptEncoding(encodings)) = req.headers.get::<AcceptEncoding>() {
-                    for QualityItem { item, .. } in encodings {
+                if let Some(&AcceptEncoding(ref encodings)) = req.headers.get::<AcceptEncoding>() {
+                    for &QualityItem { ref item, .. } in encodings {
                         if *item == Encoding::Deflate || *item == Encoding::Gzip {
                             resp.headers.set(ContentEncoding(vec![item.clone()]));
                             break;
