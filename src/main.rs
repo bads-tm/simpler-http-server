@@ -773,7 +773,7 @@ impl MainHandler {
         }
 
         // Optional upload form
-        let upload_form = if self.upload() {
+        let upload_form = if self.upload {
             format!(
                 r#"
 <form style="margin-top:1em; margin-bottom:1em;" action="{base_url}{path}" method="POST" enctype="multipart/form-data">
